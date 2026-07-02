@@ -1,0 +1,48 @@
+{
+  "//": "Cursor / VS Code run+debug configs. Copy this file to .vscode/launch.json:  mkdir -p .vscode && cp vscode-launch.json .vscode/launch.json  — then use the Run and Debug panel (F5).",
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Web Console (real AnyList via .env)",
+      "program": "${workspaceFolder}/web-console.js",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "SMS Server (real AnyList via .env)",
+      "program": "${workspaceFolder}/server.js",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Simulator (offline mock)",
+      "program": "${workspaceFolder}/simulator.js",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Tests",
+      "program": "${workspaceFolder}/test.js",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Proactive demo (offline mock)",
+      "program": "${workspaceFolder}/proactive-demo.js",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Family Grocery Bot — Debug Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#eef1f6; --card:#fff; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
+    --indigo:#4f46e5; --indigo-soft:#eef2ff;
+    --act:#16a34a; --ask:#d97706; --answer:#2563eb; --ignore:#6b7280; --pref:#7c3aed;
+    --mom:#db2777; --dad:#2563eb; --ellie:#16a34a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;line-height:1.45}
+  .wrap{max-width:1180px;margin:0 auto;padding:24px 5%}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+  header h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em}
+  header .sub{color:var(--muted);font-size:13px}
+  .badges{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .badge{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:#fff;border:1px solid var(--line)}
+  .badge b{color:var(--indigo)}
+  .btn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;cursor:pointer}
+  .btn:hover{background:#f9fafb}
+  .grid{display:grid;grid-template-columns:minmax(340px,420px) 1fr;gap:20px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0;padding:14px 16px;border-bottom:1px solid var(--line)}
+
+  /* phone */
+  .phone{display:flex;flex-direction:column;height:640px}
+  .senders{display:flex;gap:6px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .seg{flex:1;text-align:center;font-size:13px;font-weight:600;padding:8px;border-radius:10px;border:1px solid var(--line);cursor:pointer;background:#fff;color:var(--muted)}
+  .seg[data-on="1"]{color:#fff;border-color:transparent}
+  .seg.mom[data-on="1"]{background:var(--mom)} .seg.dad[data-on="1"]{background:var(--dad)} .seg.ellie[data-on="1"]{background:var(--ellie)}
+  .thread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#f8fafc}
+  .row{display:flex;flex-direction:column;max-width:82%}
+  .row.me{align-self:flex-end;align-items:flex-end}
+  .row.bot{align-self:flex-start;align-items:flex-start}
+  .who{font-size:11px;color:var(--muted);margin:0 6px 2px}
+  .bubble{padding:9px 13px;border-radius:16px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+  .me .bubble{background:var(--indigo);color:#fff;border-bottom-right-radius:5px}
+  .bot .bubble{background:#fff;border:1px solid var(--line);border-bottom-left-radius:5px}
+  .silent{font-size:12px;color:var(--muted);font-style:italic;align-self:flex-start}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;border-top:1px solid var(--line)}
+  .chip{font-size:12px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 10px;cursor:pointer;color:#374151}
+  .chip:hover{background:var(--indigo-soft);border-color:#c7d2fe}
+  .composer{display:flex;gap:8px;padding:12px;border-top:1px solid var(--line)}
+  .composer input{flex:1;font:inherit;font-size:14px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;outline:none}
+  .composer input:focus{border-color:var(--indigo)}
+  .composer button{font:inherit;font-weight:600;color:#fff;background:var(--indigo);border:0;border-radius:11px;padding:0 16px;cursor:pointer}
+
+  /* debug column */
+  .col{display:flex;flex-direction:column;gap:20px}
+  .kv{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+  .mode{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:13px}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:#f3f4f6;color:#374151;margin:2px 4px 2px 0}
+  .conf-track{height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}
+  .conf-fill{height:100%;background:linear-gradient(90deg,#6366f1,#4f46e5)}
+  .row2{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+  .row2 b{color:var(--ink)}
+  details{font-size:12px;color:var(--muted)}
+  pre{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;overflow-x:auto;margin:8px 0 0}
+  .lists{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .lists .l{padding:14px 16px}
+  .lists .l+.l{border-left:1px solid var(--line)}
+  .lists h3{margin:0 0 8px;font-size:13px}
+  .lists ul{margin:0;padding-left:18px;font-size:14px} .lists li{margin:3px 0}
+  .empty{color:var(--muted);font-size:13px;font-style:italic}
+  .memblock{padding:12px 16px;border-bottom:1px solid var(--line)}
+  .memblock:last-child{border-bottom:0}
+  .memname{font-weight:600;font-size:13px;margin-bottom:4px}
+  .mono{font-family:'JetBrains Mono',monospace;font-size:12px;color:#374151}
+  .hint{font-size:12.5px;color:var(--muted);padding:0 16px 14px}
+  .banner{font-size:12.5px;background:var(--indigo-soft);border:1px solid #c7d2fe;color:#3730a3;border-radius:10px;padding:8px 12px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>🛒 Family Grocery Bot — Debug Console</h1>
+      <div class="sub">Test the brain, memory & proactive nudges — no Twilio, no phone needed.</div>
+    </div>
+    <div class="badges">
+      <span class="badge">brain: <b id="b-engine">—</b></span>
+      <span class="badge">AnyList: <b id="b-anylist">—</b></span>
+      <span class="badge">dial: <b id="b-dial">balanced</b></span>
+      <button class="btn" id="reset">Reset</button>
+    </div>
+  </header>
+
+  <div id="mode-banner" class="banner" style="display:none"></div>
+
+  <div class="grid">
+    <!-- PHONE -->
+    <div class="card phone">
+      <div class="senders" id="senders">
+        <div class="seg mom" data-name="Mom" data-on="1">Mom</div>
+        <div class="seg dad" data-name="Dad">Dad</div>
+        <div class="seg ellie" data-name="Ellie">Ellie</div>
+      </div>
+      <div class="thread" id="thread"></div>
+      <div class="chips" id="chips"></div>
+      <div class="composer">
+        <input id="input" placeholder="Text the bot as the selected person…" autocomplete="off" />
+        <button id="sendbtn">Send</button>
+      </div>
+    </div>
+
+    <!-- DEBUG -->
+    <div class="col">
+      <div class="card">
+        <h2>🧠 Brain — last decision</h2>
+        <div class="kv" id="debug">
+          <div class="row2">Send a message to see how the brain classifies it.</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>📋 Lists (shared state)</h2>
+        <div class="lists" id="lists"></div>
+      </div>
+      <div class="card">
+        <h2>💾 Memory (learned over time)</h2>
+        <div id="memory"></div>
+        <div class="hint">Teach it: “milk means oat milk, 2 cartons”. It also learns your <i>usuals</i> from repeated adds and flags stale staples.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+ * Embedded MOCK brain — mirrors the Node brain/conversation/memory/suggestions
+ * so this page is fully interactive as a static preview. When served by
+ * web-console.js, it instead calls the real backend API (real Claude + AnyList).
+ * ==========================================================================*/
+const LISTS=['Groceries','Costco'];
+const NORMALIZE={tp:'toilet paper','paper towel':'paper towels',oj:'orange juice',pb:'peanut butter'};
+const BULK=new Set(['batteries','water','napkins','paper towels']);
+const clean=s=>s.trim().replace(/[?!.]+$/,'').trim();
+const lastWord=s=>s.trim().split(/\s+/).slice(-1)[0];
+const INTERROGATIVE=/^(which|what|whats|where|when|who|whose|why|how|do|does|did|is|are|was|were|can|could|should|would|will|have|has|any)\b/i;
+const VAGUE=new Set(['this','that','it','them','these','those','something','anything','one']);
+const ADD_CMD=/^(?:(?:can|could|would|will)\s+(?:you|we|i)\s+|please\s+|pls\s+)*(?:add|grab|get|buy|pick ?up|put)\b/i;
+const OUT_OF=/\b(we'?re out of|we are out of|out of|running low on)\b/i;
+const isQuestion=m=>/\?\s*$/.test(m)||INTERROGATIVE.test(m.trim());
+function locateItem(m){const mm=m.match(/(?:which|what)\s+list\s+(?:is|are|was|does|has|contains?)\s+(.+?)(?:\s+(?:on|in|at))?\s*\??$/i)||m.match(/where(?:'s| is| are|s)?\s+(?:the\s+|my\s+|our\s+)?(.+?)\s*\??$/i)||m.match(/(?:do|did|does)\s+(?:we|i|you)\s+(?:have|need|already have|got|have any)\s+(.+?)(?:\s+on the list)?\s*\??$/i)||m.match(/(?:have we got|got any)\s+(.+?)\s*\??$/i)||m.match(/^is\s+(?:there\s+|the\s+)?(.+?)\s+(?:on|in)\s+(?:the\s+)?(?:list|groceries|costco)\s*\??$/i);if(!mm)return undefined;let item=clean(mm[1]).replace(/\b(the|my|our|any|already)\b/gi,' ').replace(/\s+/g,' ').trim();return NORMALIZE[item.toLowerCase()]||item;}
+function buildPref(term,phrase){term=clean(term).replace(/^(the|my|our)\s+/,'');let canonical=clean(phrase),quantity=null;const cm=canonical.match(/^(.*?),\s*(.+)$/);if(cm){canonical=clean(cm[1]);quantity=clean(cm[2]);}return{term,canonical,quantity,notes:null};}
+function parsePref(m){let mm=m.match(/^(.*?)\s*(?:means|=|is always|should be)\s+(.*)$/i);if(mm)return buildPref(mm[1],mm[2]);mm=m.match(/my usual\s+(.*?)\s+is\s+(.*)$/i);if(mm)return buildPref(mm[1],mm[2]);mm=m.match(/(?:i (?:like|prefer|always get|usually get|usually buy|always buy)|we always (?:get|buy)|always get|always buy)\s+(.*)$/i);if(mm){const c=clean(mm[1]);return buildPref(lastWord(c),c);}return null;}
+function extractItems(s,prefs){const t=s.replace(/^(can you |could you |would you |will you |please |pls |we |i |you )+/gi,'').replace(/\b(add|grab|get|buy|need|pick up|pickup|we'?re out of|we are out of|out of|put|to the list|on the list)\b/g,' ').replace(/[?!.]+/g,' ');return t.split(/,|\band\b|&|\bplus\b/).map(x=>x.trim()).filter(Boolean).map(raw=>{const base=NORMALIZE[raw]||raw;const p=prefs[base.toLowerCase()];if(p)return{name:p.canonical,quantity:p.quantity,notes:p.notes};return{name:base,quantity:null,notes:null};}).filter(i=>i.name.length>1&&i.name.length<40);}
+function guessList(m){for(const l of LISTS)if(m.includes(l.toLowerCase()))return l;return null;}
+const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function stripList(m,name){return m.replace(new RegExp('\\b(?:to|on|onto|in|into|for|from)\\s+'+escRe(name)+'\\b','ig'),' ').replace(new RegExp('\\b'+escRe(name)+'\\b','ig'),' ');}
+const COREF=/\b(it|that|them|those|these)\b/i;
+function isListLists(m){return /\blists\b/.test(m)&&/(what|which|show|see|how many|all|my|give|list)\b/.test(m);}
+function canonList(name){return name?LISTS.find(l=>l.toLowerCase()===String(name).toLowerCase())||null:null;}
+function extractItemsMultiList(m,prefs){const clauses=m.split(/\s+and\s+/);const out=[];for(const cl of clauses){const list=guessList(cl);const src=list?stripList(cl,list):cl;for(const it of extractItems(src,prefs))out.push({...it,list:list||null});}return out;}
+function classifyMock(message,prefs,lastItems){const m=message.trim().toLowerCase();
+  if(/^(thanks|thx|thank you|ty|great|nice|perfect|cool|love it)\b/.test(m))return{intent:'chitchat',items:[],targetList:null,confidence:0.12,needsClarification:false,preferences:[]};
+  if(isListLists(m))return{intent:'list_lists',items:[],targetList:null,confidence:0.95,needsClarification:false,preferences:[]};
+  if(/(what'?s|whats|show|see|view).*(list|need|groceries|grocery)/.test(m)||/^(the )?list\??$/.test(m))return{intent:'query',items:[],targetList:guessList(m),confidence:0.95,needsClarification:false,preferences:[]};
+  const loc=locateItem(m);if(loc!==undefined){if(!loc||VAGUE.has(loc.toLowerCase())||loc.length<2)return{intent:'ambiguous',items:[],targetList:null,confidence:0.5,needsClarification:true,clarifyingQuestion:'Which item are you asking about?',preferences:[]};return{intent:'locate',items:[{name:loc,quantity:null,notes:null,list:null}],targetList:null,confidence:0.9,needsClarification:false,preferences:[]};}
+  const isAddCmd=ADD_CMD.test(m)||OUT_OF.test(m);
+  if(COREF.test(m)&&lastItems&&lastItems.length&&(isAddCmd||/^(it|that|them|those|these)\b/.test(m))){const list=guessList(m);return{intent:'add',items:lastItems.map(n=>({name:n,quantity:null,notes:null,list})),targetList:null,confidence:0.9,needsClarification:false,preferences:[]};}
+  if(!isAddCmd&&/(don'?t need|scratch|remove|take off|delete|cross off)/.test(m)){const items=extractItemsMultiList(m.replace(/.*(don'?t need|scratch( the)?|remove|take off|delete|cross off)/,''),prefs);return{intent:'remove',items,targetList:null,confidence:items.length?0.85:0.4,needsClarification:items.length===0,clarifyingQuestion:'What should I take off the list?',preferences:[]};}
+  if(!isAddCmd){const pref=parsePref(m);if(pref)return{intent:'preference',items:[],targetList:null,confidence:0.9,needsClarification:false,preferences:[pref]};if(isQuestion(m))return{intent:'ambiguous',items:[],targetList:null,confidence:0.5,needsClarification:true,clarifyingQuestion:"I can add items, tell you what's on a list, or list your lists — what would you like?",preferences:[]};}
+  const items=extractItemsMultiList(m,prefs);const looksSentence=items.some(i=>i.name.split(/\s+/).length>4||/\?$/.test(i.name));if(!items.length||looksSentence)return{intent:'ambiguous',items:[],targetList:null,confidence:0.3,needsClarification:true,clarifyingQuestion:"I didn't catch a grocery item — what should I add?",preferences:[]};
+  return{intent:'add',items,targetList:null,confidence:0.92,needsClarification:false,preferences:[]};}
+function applyPolicy(c){if(c.intent==='query'||c.intent==='locate')return'answer';if(c.intent==='chitchat')return'ignore';if(c.needsClarification)return'ask';if(c.confidence>=0.75)return'act';if(c.confidence>=0.45)return'ask';return'ignore';}
+
+/* in-page memory + list state */
+const store={Groceries:[],Costco:[]};
+const mem={members:{},household:{items:{}}};
+function memMember(n){return mem.members[n]||(mem.members[n]={prefs:{},items:{}});}
+function recordAdd(n,name){const k=name.toLowerCase();const b=x=>{const r=x[k]||(x[k]={n:0,lastAt:0});r.n++;r.lastAt=Date.now();};b(memMember(n).items);b(mem.household.items);}
+function memberItems(n){const m=mem.members[n];return m?Object.entries(m.items).map(([name,r])=>({name,n:r.n,lastAt:r.lastAt})):[];}
+function usualsToAdd(n,curSet){return memberItems(n).filter(it=>it.n>=2&&!curSet.has(it.name)).sort((a,b)=>b.n-a.n).slice(0,3).map(it=>it.name);}
+function curSet(){return new Set([...store.Groceries,...store.Costco].map(s=>s.toLowerCase()));}
+const pending={},offered={},undoStack={},lastNudge={},lastItemsBy={};
+const disp=it=>it.name+(it.quantity?` (${it.quantity})`:'');
+function addItem(list,name){const a=store[list];if(a.some(x=>x.toLowerCase()===name.toLowerCase()))return{dup:true};a.push(name);return{added:true};}
+function removeItem(list,name){const a=store[list];const i=a.findIndex(x=>x.toLowerCase()===name.toLowerCase());if(i<0)return{};a.splice(i,1);return{removed:true};}
+function pushUndo(s,e){(undoStack[s]||(undoStack[s]=[])).push(e);}
+function act(sender,c){const groups=new Map();for(const it of c.items){const l=canonList(it.list)||canonList(c.targetList)||LISTS[0];(groups.get(l)||groups.set(l,[]).get(l)).push(it);}
+  if(c.intent==='remove'){const parts=[],readd=[],un=[];for(const [l,items] of groups){const removed=[];for(const it of items)if(removeItem(l,it.name).removed){removed.push(it.name);un.push([l,it.name]);}if(removed.length){parts.push(`${removed.join(', ')} from ${l}`);readd.push(`${removed.join(', ')} to ${l}`);}}if(un.length)pushUndo(sender,{label:`Re-added ${readd.join('; ')}`,undo:()=>un.forEach(([l,n])=>addItem(l,n))});return parts.length?`🗑️ Removed ${parts.join('; ')} · reply UNDO`:'Nothing to remove.';}
+  const addedSegs=[],dupSegs=[],un=[],names=[];for(const [l,items] of groups){const added=[],dups=[];for(const it of items){const r=addItem(l,it.name);if(r.added){added.push(disp(it));un.push([l,it.name]);names.push(it.name);recordAdd(sender,it.name);}else if(r.dup)dups.push(it.name);}if(added.length)addedSegs.push(`${added.join(', ')} to ${l}`);if(dups.length)dupSegs.push(`${dups.join(', ')} already on ${l}`);}
+  if(un.length)pushUndo(sender,{label:`Removed ${names.join(', ')}`,undo:()=>un.forEach(([l,n])=>removeItem(l,n))});
+  if(names.length)lastItemsBy[sender]=names;
+  let msg=addedSegs.length?`✅ Added ${addedSegs.join('; ')}`:'';if(dupSegs.length)msg+=(msg?' ':'')+`(${dupSegs.join('; ')})`;
+  return (msg||'Nothing new to add')+' · reply UNDO';}
+function maybeNudge(sender,replies,debug){if(Date.now()-(lastNudge[sender]||0)<6*3600e3)return;const top=usualsToAdd(sender,curSet());if(!top.length)return;offered[sender]={items:top,at:Date.now()};lastNudge[sender]=Date.now();debug.nudged=top;replies.push(`🧺 You usually also grab ${top.join(', ')} — reply USUAL to add.`);}
+function handleMock(sender,text){const t=text.trim();
+  if(/^(stop|unsubscribe|cancel|end|quit)$/i.test(t))return{replies:["You're opted out. Reply START to resume."],debug:{intent:'stop'}};
+  if(/^(help|info)$/i.test(t))return{replies:['Text items to add, say "milk means oat milk" to teach a preference, "USUAL" to add usuals, or ask what is on the list.'],debug:{intent:'help'}};
+  if(/^(undo|nvm|never ?mind)$/i.test(t)){const l=(undoStack[sender]||[]).pop();if(l){l.undo();return{replies:['↩️ '+l.label],debug:{intent:'undo'}};}return{replies:['Nothing to undo.'],debug:{intent:'undo'}};}
+  if(/^(?:(?:add|get|grab)\s+)?(?:the\s+|my\s+)?usuals?$/i.test(t)){const u=usualsToAdd(sender,curSet());delete offered[sender];if(!u.length)return{replies:["No usuals learned yet — keep using me and I'll pick them up."],debug:{intent:'usual'}};return{replies:[act(sender,{intent:'add',items:u.map(n=>({name:n})),targetList:LISTS[0]})],debug:{intent:'usual',added:u}};}
+  if(pending[sender]){const low=t.toLowerCase();const chosen=LISTS.find(l=>low.includes(l.toLowerCase()));
+    if(/^(yes|yep|yeah|ok|okay|sure|do it|y)\b/.test(low)){const c=pending[sender];delete pending[sender];return{replies:[act(sender,c)],debug:{intent:c.intent,resolved:true}};}
+    if(/^(no|nope|cancel|n)\b/.test(low)){delete pending[sender];return{replies:['Okay, cancelled.'],debug:{intent:'cancel'}};}
+    if(chosen){const c=pending[sender];delete pending[sender];return{replies:[act(sender,{...c,targetList:chosen})],debug:{intent:c.intent,resolved:true}};}}
+  if(offered[sender]&&Date.now()-offered[sender].at<1800e3&&/^(yes|yep|yeah|ok|okay|sure|do it|please do)$/i.test(t)){const items=offered[sender].items;delete offered[sender];return{replies:[act(sender,{intent:'add',items:items.map(n=>({name:n})),targetList:LISTS[0]})],debug:{intent:'usual-accept',added:items}};}
+  const prefs=(mem.members[sender]&&mem.members[sender].prefs)||{};
+  const c=classifyMock(text,prefs,lastItemsBy[sender]||[]);
+  if(c.intent==='list_lists')return{replies:['Your lists: '+LISTS.map(l=>`${l} (${store[l].length})`).join(', ')],debug:{engine:'mock',intent:'list_lists'}};
+  if(c.intent==='preference'&&c.preferences.length){const parts=c.preferences.map(p=>{memMember(sender).prefs[p.term.toLowerCase()]={term:p.term,canonical:p.canonical,quantity:p.quantity,notes:p.notes};return `${p.term} → ${p.canonical}${p.quantity?` (${p.quantity})`:''}`;});return{replies:[`Got it — I'll remember for ${sender}: ${parts.join('; ')}`],debug:{engine:'mock',intent:'preference',learned:parts}};}
+  if(c.intent==='locate'){const item=c.items&&c.items[0]&&c.items[0].name;if(!item)return{replies:['Which item are you asking about?'],debug:{engine:'mock',intent:'locate'}};const q=item.toLowerCase();const found=LISTS.filter(l=>store[l].some(x=>x.toLowerCase()===q||x.toLowerCase().includes(q)));if(found.length)return{replies:[`${item} is on ${found.join(' and ')}.`],debug:{engine:'mock',intent:'locate',found}};pending[sender]={intent:'add',items:[{name:item}],targetList:LISTS[0]};return{replies:[`I don't see ${item} on any list — want me to add it? (reply yes)`],debug:{engine:'mock',intent:'locate',found:[]}};}
+  const mode=applyPolicy(c);const debug={engine:'mock',intent:c.intent,confidence:c.confidence,mode};
+  if(mode==='ignore')return{replies:[],debug};
+  if(mode==='answer'){if(c.targetList)return{replies:[`${c.targetList}: ${store[c.targetList].join(', ')||'(empty)'}`],debug};return{replies:[LISTS.map(l=>`${l}: ${store[l].join(', ')||'(empty)'}`).join('\n')],debug};}
+  if(mode==='ask'){if(c.items&&c.items.length)pending[sender]=c;return{replies:[c.clarifyingQuestion||`Add ${c.items.map(disp).join(', ')} to ${c.targetList||LISTS[0]}? (reply yes)`],debug};}
+  const replies=[act(sender,c)];if(c.intent==='add')maybeNudge(sender,replies,debug);return{replies,debug};}
+
+/* ============================ UI ============================ */
+let MODE='mock', currentSender='Mom';
+const $=id=>document.getElementById(id);
+const thread=$('thread');
+
+async function boot(){
+  try{ const r=await fetch('/api/state'); if(r.ok){ const s=await r.json(); MODE='backend'; applyMeta(s); renderLists(s.lists); renderMemory(s.memory); showBanner(`Connected to live backend — ${s.engine} brain, ${s.anylist} AnyList. Every message hits the real conversation core.`); return; } }catch(e){}
+  MODE='mock'; applyMeta({engine:'mock',anylist:'mock',dial:'balanced'}); renderLists(store); renderMemory(mem);
+  showBanner('In-page preview — running the offline <b>mock brain</b> client-side. The downloadable local console runs the real Claude brain and connects to AnyList.');
+}
+function applyMeta(s){$('b-engine').textContent=s.engine;$('b-anylist').textContent=s.anylist;$('b-dial').textContent=s.dial||'balanced';}
+function showBanner(html){const b=$('mode-banner');b.innerHTML=html;b.style.display='block';}
+
+function addBubble(kind,who,text){const row=document.createElement('div');row.className='row '+(kind==='me'?'me':'bot');if(who){const w=document.createElement('div');w.className='who';w.textContent=who;row.appendChild(w);}const b=document.createElement('div');b.className='bubble';b.textContent=text;row.appendChild(b);thread.appendChild(row);thread.scrollTop=thread.scrollHeight;}
+function addSilent(){const d=document.createElement('div');d.className='silent';d.textContent='· bot stayed silent (IGNORE — not a grocery request)';thread.appendChild(d);thread.scrollTop=thread.scrollHeight;}
+
+const MODE_COLOR={act:'var(--act)',ask:'var(--ask)',answer:'var(--answer)',ignore:'var(--ignore)'};
+function renderDebug(d){const box=$('debug');if(!d){box.innerHTML='';return;}
+  const conf=(typeof d.confidence==='number')?d.confidence:null;
+  const modeTxt=(d.mode||d.intent||'').toUpperCase();
+  const color=MODE_COLOR[d.mode]||'var(--pref)';
+  let h='';
+  h+=`<div class="mode"><span class="dot" style="background:${color}"></span>${modeTxt}</div>`;
+  h+=`<div class="row2">intent <b>${d.intent||'—'}</b> &nbsp;·&nbsp; engine <b>${d.engine||MODE}</b>${d.resolved?' &nbsp;·&nbsp; <b>resolved pending</b>':''}</div>`;
+  if(conf!==null){h+=`<div><div class="row2" style="margin-bottom:4px">confidence <b>${conf.toFixed(2)}</b></div><div class="conf-track"><div class="conf-fill" style="width:${Math.round(conf*100)}%"></div></div></div>`;}
+  if(d.learned)h+=`<div class="row2">learned: ${d.learned.map(x=>`<span class="pill">${x}</span>`).join('')}</div>`;
+  if(d.added)h+=`<div class="row2">added: ${d.added.map(x=>`<span class="pill">${x}</span>`).join('')}</div>`;
+  if(d.nudged)h+=`<div class="row2">🧺 nudged: ${d.nudged.map(x=>`<span class="pill">${x}</span>`).join('')}</div>`;
+  h+=`<details><summary>raw classification JSON</summary><pre>${escapeHtml(JSON.stringify(d,null,2))}</pre></details>`;
+  box.innerHTML=h;
+}
+function renderLists(lists){const el=$('lists');const names=Object.keys(lists||{});const use=names.length?names:LISTS;el.innerHTML=use.map(l=>{const items=(lists[l]||[]);return `<div class="l"><h3>${escapeHtml(l)} <span class="mono">(${items.length})</span></h3>${items.length?'<ul>'+items.map(i=>`<li>${escapeHtml(i)}</li>`).join('')+'</ul>':'<div class="empty">empty</div>'}</div>`;}).join('');}
+function renderMemory(memory){const el=$('memory');const members=memory.members||{};let h='';
+  const names=Object.keys(members);
+  if(!names.length)h+='<div class="hint" style="padding-top:12px">No one has taught a preference or built a history yet.</div>';
+  for(const n of names){const m=members[n];const prefs=Object.values(m.prefs||{});const items=Object.entries(m.items||{}).sort((a,b)=>b[1].n-a[1].n);
+    h+=`<div class="memblock"><div class="memname">${n}</div>`;
+    h+=prefs.length?`<div class="mono">prefs: ${prefs.map(p=>`${p.term}→${p.canonical}${p.quantity?` (${p.quantity})`:''}`).join(', ')}</div>`:`<div class="mono" style="color:#9ca3af">prefs: none</div>`;
+    if(items.length)h+=`<div class="mono" style="margin-top:3px">usuals: ${items.slice(0,6).map(([k,r])=>`${k}×${r.n}`).join(', ')}</div>`;
+    h+='</div>';}
+  const hh=(memory.household&&memory.household.items)||{};const staples=Object.entries(hh).filter(([,r])=>r.n>=3).sort((a,b)=>b[1].n-a[1].n).map(([k])=>k);
+  if(staples.length)h+=`<div class="memblock"><div class="memname">🏠 Household staples</div><div class="mono">${staples.join(', ')}</div></div>`;
+  el.innerHTML=h;
+}
+function escapeHtml(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+async function send(text){text=(text||'').trim();if(!text)return;addBubble('me',currentSender,text);$('input').value='';
+  if(MODE==='backend'){
+    try{const r=await fetch('/api/message',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({from:currentSender,text})}).then(r=>r.json());
+      if(r.replies&&r.replies.length)r.replies.forEach(x=>addBubble('bot',null,x));else addSilent();
+      renderDebug(r.debug);renderLists(r.lists);renderMemory(r.memory);}catch(e){addSilent();}
+  }else{
+    const r=handleMock(currentSender,text);
+    if(r.replies&&r.replies.length)r.replies.forEach(x=>addBubble('bot',null,x));else addSilent();
+    renderDebug(r.debug);renderLists(store);renderMemory(mem);
+  }
+}
+
+/* wire up */
+document.querySelectorAll('.seg').forEach(el=>el.addEventListener('click',()=>{document.querySelectorAll('.seg').forEach(s=>s.removeAttribute('data-on'));el.setAttribute('data-on','1');currentSender=el.dataset.name;}));
+$('sendbtn').addEventListener('click',()=>send($('input').value));
+$('input').addEventListener('keydown',e=>{if(e.key==='Enter')send($('input').value);});
+const CHIPS=['grab oat milk, eggs and tp',"we're out of coffee",'can you add batteries?','milk means oat milk, 2 cartons',"what's on the list?",'USUAL','undo','thx!!'];
+$('chips').innerHTML=CHIPS.map(c=>`<span class="chip">${escapeHtml(c)}</span>`).join('');
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>send(c.textContent)));
+$('reset').addEventListener('click',async()=>{
+  thread.innerHTML='';renderDebug(null);
+  if(MODE==='backend'){const s=await fetch('/api/reset',{method:'POST'}).then(r=>r.json());renderLists(s.lists);renderMemory(s.memory);}
+  else{store.Groceries=[];store.Costco=[];for(const k in mem.members)delete mem.members[k];mem.household={items:{}};for(const k in pending)delete pending[k];for(const k in offered)delete offered[k];for(const k in undoStack)delete undoStack[k];for(const k in lastNudge)delete lastNudge[k];renderLists(store);renderMemory(mem);}
+});
+boot();
+</script>
+</body>
+</html>

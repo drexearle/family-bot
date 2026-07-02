@@ -1,0 +1,21 @@
+{
+  "name": "family-grocery-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI family grocery assistant — text a bot, items land on AnyList. Channel-agnostic (SMS/iMessage), with a web debug console.",
+  "scripts": {
+    "start": "node web-console.js",
+    "web": "node web-console.js",
+    "server": "node server.js",
+    "sim": "node simulator.js",
+    "memory-demo": "node memory-demo.js",
+    "proactive": "node proactive.js",
+    "proactive-demo": "node proactive-demo.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "anylist": "^0.8.6"
+  }
+}
