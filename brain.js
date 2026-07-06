@@ -27,7 +27,7 @@ const DIALS = {
 const SYSTEM_PROMPT = `You are "Pantry", the brain of one family's shared assistant across their AnyList lists.
 Turn casual texts into precise actions. Output ONE JSON object and nothing else:
 {
-  "intent": "add" | "remove" | "query" | "locate" | "list_lists" | "preference" | "chitchat" | "ambiguous",
+  "intent": "add" | "remove" | "clear" | "query" | "locate" | "list_lists" | "preference" | "chitchat" | "ambiguous",
   "items": [{ "name": string, "quantity": string|null, "notes": string|null, "list": string|null }],
   "targetList": string|null,          // fallback list when items don't each specify one
   "confidence": number,               // 0..1, honest about intent AND items
@@ -51,13 +51,15 @@ Other rules:
 - Learn stated preferences ("milk means oat milk") -> intent "preference".
 - QUESTIONS ARE NEVER ADDS: "what's on the list?" -> query; "which list is milk on?" -> locate; "what lists do we have?" -> list_lists. Never put a question on a list.
 - If you can't extract a concrete item to add, don't add — ask.
+- "clear/empty the X list" or "remove everything from X" -> intent "clear" with that list in targetList (leave null if no list is named). This wipes the whole list, so it is confirmed before running.
 - Keep replyText short. Be honest with confidence.
 
 Examples:
 - "add milk to the grocery list and batteries to costco" -> {"intent":"add","items":[{"name":"milk","list":"<grocery list name>"},{"name":"batteries","list":"Costco"}]}
 - "what lists do we have?" -> {"intent":"list_lists","items":[]}
 - "add it to the shared list" (after discussing Olipop) -> {"intent":"add","items":[{"name":"Olipop","list":"<shared list name>"}]}
-- "which list is milk on?" -> {"intent":"locate","items":[{"name":"milk"}]}`;
+- "which list is milk on?" -> {"intent":"locate","items":[{"name":"milk"}]}
+- "clear the grocery list" -> {"intent":"clear","targetList":"<grocery list name>","items":[]}`;
 
 // ── REAL classifier (Claude via fetch) ────────────────────────────────────
 async function classifyWithClaude(message, ctx) {
@@ -170,6 +172,12 @@ function classifyMock(message, ctx) {
   if (loc !== undefined) {
     if (!loc || VAGUE.has(loc.toLowerCase()) || loc.length < 2) return pack('ambiguous', [], null, 0.5, true, 'Which item are you asking about?');
     return pack('locate', [{ name: loc, list: null }], null, 0.9);
+  }
+
+  // Clear a whole list ("clear the grocery list", "empty costco", "remove everything from X").
+  if (/\b(clear|empty|wipe)\b.*\b(list|groceries|grocery|costco|everything|all)\b/i.test(m)
+    || /\b(remove|delete|take off|get rid of)\s+(all|everything)\b/i.test(m)) {
+    return pack('clear', [], guessList(m, ctx), 0.9);
   }
 
   const isAddCmd = ADD_CMD.test(m) || OUT_OF.test(m);

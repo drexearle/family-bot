@@ -52,6 +52,14 @@ function createConversation({ store, lists, preferences = {}, dial = 'balanced',
   };
 
   async function act(sender, c) {
+    if (c.intent === 'clear') {
+      const list = canonList(c.targetList) || defaultList;
+      const undos = [];
+      for (const name of store.getItems(list)) { const r = await store.removeItem(list, name); if (r.removed) undos.push(r.undo); }
+      if (undos.length) push(sender, { label: `Restored ${undos.length} item(s) to ${list}`, undo: async () => { for (const u of undos) await u(); } });
+      return `🧹 Cleared ${undos.length} item(s) from ${list} · reply UNDO`;
+    }
+
     const groups = groupByList(c.items, c.targetList);
     const undos = [];
 
@@ -162,6 +170,14 @@ function createConversation({ store, lists, preferences = {}, dial = 'balanced',
       const reply = [`Got it — I'll remember for ${sender}: ${parts.join('; ')}`];
       if (c.items && c.items.length) reply.push(await act(sender, c));
       return { replies: reply, debug: { engine: c._engine, intent: 'preference', learned: parts, sender } };
+    }
+    if (c.intent === 'clear') {
+      const list = canonList(c.targetList);
+      if (!list) return { replies: ['Which list should I clear? (name the list)'], debug: { engine: c._engine, intent: 'clear', sender } };
+      const n = store.getItems(list).length;
+      if (!n) return { replies: [`${list} is already empty.`], debug: { engine: c._engine, intent: 'clear', sender } };
+      pending[sender] = { intent: 'clear', targetList: list, items: [] };
+      return { replies: [`Clear all ${n} item(s) from ${list}? Reply YES (undoable).`], debug: { engine: c._engine, intent: 'clear', confirm: true, sender } };
     }
     if (c.intent === 'locate') return locate(sender, c.items && c.items[0] && c.items[0].name, c._engine);
 
