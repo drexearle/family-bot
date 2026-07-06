@@ -30,6 +30,7 @@ function createConversation({ store, lists, preferences = {}, dial = 'balanced',
   const lastNudgeAt = {};
   const lastActions = {};
   const lastItems = {};      // sender -> [names] most recently added (for "add it/those")
+  const lastList = {};       // sender -> last list name discussed (for "how many on it")
   const history = {};        // sender -> [{ role, text }] recent turns (for coreference)
   const optedOut = new Set();
 
@@ -60,36 +61,45 @@ function createConversation({ store, lists, preferences = {}, dial = 'balanced',
       return `🧹 Cleared ${undos.length} item(s) from ${list} · reply UNDO`;
     }
 
-    const groups = groupByList(c.items, c.targetList);
-    const undos = [];
-
-    if (c.intent === 'remove') {
-      const parts = [], readd = [];
-      for (const [l, items] of groups) {
-        const removed = [];
-        for (const it of items) { const r = await store.removeItem(l, it.name); if (r.removed) { removed.push(it.name); undos.push(r.undo); } }
-        if (removed.length) { parts.push(`${removed.join(', ')} from ${l}`); readd.push(`${removed.join(', ')} to ${l}`); }
-      }
-      if (undos.length) push(sender, { label: `Re-added ${readd.join('; ')}`, undo: async () => { for (const u of undos) await u(); } });
-      return parts.length ? `🗑️ Removed ${parts.join('; ')} · reply UNDO` : 'Nothing to remove.';
+    // add / remove / update — one pass over per-item ops, one combined receipt + one undo
+    const undos = [], addedNames = [];
+    const addGroups = new Map(), removeGroups = new Map();
+    for (const it of c.items) {
+      const op = it.op || (c.intent === 'remove' ? 'remove' : 'add');
+      const l = canonList(it.list) || canonList(c.targetList) || defaultList;
+      const g = op === 'remove' ? removeGroups : addGroups;
+      (g.get(l) || g.set(l, []).get(l)).push(it);
     }
 
-    const addedSegs = [], dupSegs = [], addedNames = [];
-    for (const [l, items] of groups) {
+    const removedSegs = [], readdSegs = [];
+    for (const [l, items] of removeGroups) {
+      const removed = [];
+      for (const it of items) { const r = await store.removeItem(l, it.name); if (r.removed) { removed.push(it.name); undos.push(r.undo); } }
+      if (removed.length) { removedSegs.push(`${removed.join(', ')} from ${l}`); readdSegs.push(`re-added ${removed.join(', ')} to ${l}`); }
+    }
+
+    const addedSegs = [], dupSegs = [];
+    for (const [l, items] of addGroups) {
       const added = [], dups = [];
       for (const it of items) {
         const r = await store.addItem(l, it);
         if (r.added) { added.push(display(it)); undos.push(r.undo); addedNames.push(it.name); memory.recordAdd(sender, it.name); }
         else if (r.duplicate) dups.push(it.name);
       }
-      if (added.length) addedSegs.push(`${added.join(', ')} to ${l}`);
+      if (added.length) { addedSegs.push(`${added.join(', ')} to ${l}`); readdSegs.push(`removed ${added.join(', ')} from ${l}`); }
       if (dups.length) dupSegs.push(`${dups.join(', ')} already on ${l}`);
     }
-    if (undos.length) push(sender, { label: `Removed ${addedNames.join(', ')}`, undo: async () => { for (const u of undos) await u(); } });
+
+    if (undos.length) push(sender, { label: readdSegs.join('; ') || 'Reverted', undo: async () => { for (const u of undos) await u(); } });
     if (addedNames.length) lastItems[sender] = addedNames;
-    let msg = addedSegs.length ? `✅ Added ${addedSegs.join('; ')}` : '';
-    if (dupSegs.length) msg += (msg ? ' ' : '') + `(${dupSegs.join('; ')})`;
-    return (msg || 'Nothing new to add') + ' · reply UNDO';
+    const firstList = [...removeGroups.keys(), ...addGroups.keys()][0];
+    if (firstList) lastList[sender] = firstList;
+
+    const parts = [];
+    if (removedSegs.length) parts.push(`🗑️ Removed ${removedSegs.join('; ')}`);
+    if (addedSegs.length) parts.push(`✅ Added ${addedSegs.join('; ')}`);
+    if (dupSegs.length) parts.push(`(${dupSegs.join('; ')})`);
+    return (parts.join(' · ') || 'Nothing to do') + ' · reply UNDO';
   }
 
   function maybeNudge(sender, replies, debug, now = Date.now()) {
@@ -179,6 +189,18 @@ function createConversation({ store, lists, preferences = {}, dial = 'balanced',
       pending[sender] = { intent: 'clear', targetList: list, items: [] };
       return { replies: [`Clear all ${n} item(s) from ${list}? Reply YES (undoable).`], debug: { engine: c._engine, intent: 'clear', confirm: true, sender } };
     }
+    if (c.intent === 'count') {
+      const list = canonList(c.targetList) || lastList[sender];
+      if (!list) return { replies: [lists.length <= 3 ? lists.map((l) => `${l}: ${store.getItems(l).length}`).join(', ') : `Which list? You have ${lists.length} — name one.`], debug: { engine: c._engine, intent: 'count', sender } };
+      lastList[sender] = list;
+      return { replies: [`${list} has ${store.getItems(list).length} item(s).`], debug: { engine: c._engine, intent: 'count', sender } };
+    }
+    if (c.intent === 'create_list') {
+      return { replies: ["I can't create new lists yet — AnyList's API doesn't allow it. Make the list in the AnyList app and I'll use it right away."], debug: { engine: c._engine, intent: 'create_list', sender } };
+    }
+    if (c.intent === 'delete_list') {
+      return { replies: ['I can\'t delete a whole list — do that in the AnyList app. I can empty one for you though: say "clear the <list> list".'], debug: { engine: c._engine, intent: 'delete_list', sender } };
+    }
     if (c.intent === 'locate') return locate(sender, c.items && c.items[0] && c.items[0].name, c._engine);
 
     const { mode } = applyPolicy(c, dial);
@@ -186,10 +208,15 @@ function createConversation({ store, lists, preferences = {}, dial = 'balanced',
 
     if (mode === 'ignore') return { replies: [], debug };
     if (mode === 'answer') {
-      if (c.targetList && canonList(c.targetList)) return { replies: [`${canonList(c.targetList)}: ${store.getItems(canonList(c.targetList)).join(', ') || '(empty)'}`], debug };
-      return { replies: [lists.map((l) => `${l}: ${store.getItems(l).join(', ') || '(empty)'}`).join('\n')], debug };
+      const list = canonList(c.targetList) || lastList[sender];
+      if (list) { lastList[sender] = list; return { replies: [`${list}: ${store.getItems(list).join(', ') || '(empty)'}`], debug }; }
+      if (lists.length <= 3) return { replies: [lists.map((l) => `${l}: ${store.getItems(l).join(', ') || '(empty)'}`).join('\n')], debug };
+      return { replies: [`Which list? You have ${lists.length} — name one (e.g. "what's on the ${defaultList} list?"), or say "what lists do we have?"`], debug };
     }
-    if (mode === 'ask') { if (c.items && c.items.length) pending[sender] = c; return { replies: [c.clarifyingQuestion || `Add ${c.items.map(display).join(', ')}? (reply yes)`], debug }; }
+    if (mode === 'ask') {
+      if (c.items && c.items.length) { pending[sender] = c; return { replies: [c.clarifyingQuestion || `Add ${c.items.map(display).join(', ')}? (reply yes)`], debug }; }
+      return { replies: [c.clarifyingQuestion || "I didn't quite catch that — I can add or remove items, clear a list, tell you what's on one, or list your lists. What would you like?"], debug };
+    }
 
     const replies = [await act(sender, c)];
     if (c.intent === 'add') maybeNudge(sender, replies, debug);

@@ -27,8 +27,8 @@ const DIALS = {
 const SYSTEM_PROMPT = `You are "Pantry", the brain of one family's shared assistant across their AnyList lists.
 Turn casual texts into precise actions. Output ONE JSON object and nothing else:
 {
-  "intent": "add" | "remove" | "clear" | "query" | "locate" | "list_lists" | "preference" | "chitchat" | "ambiguous",
-  "items": [{ "name": string, "quantity": string|null, "notes": string|null, "list": string|null }],
+  "intent": "add" | "remove" | "update" | "clear" | "query" | "count" | "locate" | "list_lists" | "create_list" | "delete_list" | "preference" | "chitchat" | "ambiguous",
+  "items": [{ "name": string, "quantity": string|null, "notes": string|null, "list": string|null, "op": "add" | "remove" }],
   "targetList": string|null,          // fallback list when items don't each specify one
   "confidence": number,               // 0..1, honest about intent AND items
   "needsClarification": boolean,
@@ -52,6 +52,11 @@ Other rules:
 - QUESTIONS ARE NEVER ADDS: "what's on the list?" -> query; "which list is milk on?" -> locate; "what lists do we have?" -> list_lists. Never put a question on a list.
 - If you can't extract a concrete item to add, don't add — ask.
 - "clear/empty the X list" or "remove everything from X" -> intent "clear" with that list in targetList (leave null if no list is named). This wipes the whole list, so it is confirmed before running.
+- MIXED actions in one message ("remove milk and eggs and add bread") -> intent "update" with each item carrying its own "op" ("add" or "remove"). Use this whenever one message both adds and removes.
+- "how many items on X" / "how many on it" / "count the X list" -> intent "count" (put the list in targetList; use recent conversation to resolve "it").
+- "make/create a new list" -> intent "create_list". "delete the whole X list" -> intent "delete_list". (Item-level "remove X" is still "remove"/"update", not delete_list.)
+- NEVER use "chitchat" unless the message is purely social (e.g. "thanks"). If a request is unclear, use "ambiguous" with a short clarifyingQuestion — never go silent.
+- For "query", put the specific list in targetList; if the user didn't name one, leave it null and the app will ask which.
 - Keep replyText short. Be honest with confidence.
 
 Examples:
@@ -59,7 +64,10 @@ Examples:
 - "what lists do we have?" -> {"intent":"list_lists","items":[]}
 - "add it to the shared list" (after discussing Olipop) -> {"intent":"add","items":[{"name":"Olipop","list":"<shared list name>"}]}
 - "which list is milk on?" -> {"intent":"locate","items":[{"name":"milk"}]}
-- "clear the grocery list" -> {"intent":"clear","targetList":"<grocery list name>","items":[]}`;
+- "clear the grocery list" -> {"intent":"clear","targetList":"<grocery list name>","items":[]}
+- "remove parchment paper and cashews and add taco meat" -> {"intent":"update","items":[{"name":"parchment paper","op":"remove"},{"name":"cashews","op":"remove"},{"name":"taco meat","op":"add"}]}
+- "how many items are on it?" (after discussing Christmas) -> {"intent":"count","targetList":"Christmas","items":[]}
+- "can you create a new list called Camping?" -> {"intent":"create_list","items":[]}`;
 
 // ── REAL classifier (Claude via fetch) ────────────────────────────────────
 async function classifyWithClaude(message, ctx) {
@@ -94,6 +102,7 @@ Sender: ${ctx.sender || 'unknown'}
 ${who}'s saved preferences: ${prefLines.join('; ') || 'none yet'}
 ${who} usually buys: ${(prof.usuals || []).join(', ') || 'unknown'}
 Recently added by ${who}: ${(ctx.lastItems || []).join(', ') || 'nothing yet'}
+Last list discussed: ${ctx.lastList || 'none'}
 Currently on lists: ${onList || 'empty'}`;
 }
 
@@ -116,7 +125,7 @@ const lastWord = (s) => s.trim().split(/\s+/).slice(-1)[0];
 const isQuestion = (m) => /\?\s*$/.test(m) || INTERROGATIVE.test(m.trim());
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-function guessList(m, ctx) { for (const l of ctx.lists) if (m.includes(l.toLowerCase())) return l; return null; }
+function guessList(m, ctx) { for (const l of ctx.lists) if (new RegExp('\\b' + escRe(l.toLowerCase()) + '\\b').test(m)) return l; return null; }
 function stripList(m, name) {
   return m.replace(new RegExp('\\b(?:to|on|onto|in|into|for|from)\\s+' + escRe(name) + '\\b', 'ig'), ' ')
     .replace(new RegExp('\\b' + escRe(name) + '\\b', 'ig'), ' ');
@@ -167,6 +176,7 @@ function classifyMock(message, ctx) {
   if (/^(thanks|thx|thank you|ty|great|nice|perfect|cool|love it|👍|🙏)\b/.test(m) || m === '🙏') return pack('chitchat', [], null, 0.12);
   if (isListLists(m)) return pack('list_lists', [], null, 0.95);
   if (/(what'?s|whats|show|see|view).*(list|need|groceries|grocery)/.test(m) || /^(the )?list\??$/.test(m)) return pack('query', [], guessList(m, ctx), 0.95);
+  if (/\bhow many\b/.test(m)) return pack('count', [], guessList(m, ctx), 0.9);
 
   const loc = locateItem(m);
   if (loc !== undefined) {
@@ -178,6 +188,22 @@ function classifyMock(message, ctx) {
   if (/\b(clear|empty|wipe)\b.*\b(list|groceries|grocery|costco|everything|all)\b/i.test(m)
     || /\b(remove|delete|take off|get rid of)\s+(all|everything)\b/i.test(m)) {
     return pack('clear', [], guessList(m, ctx), 0.9);
+  }
+
+  // Create / delete a whole list (not supported by the AnyList lib — handled with an explainer).
+  if (/\b(create|make|start|set up|new)\b[^?]*\blist\b/i.test(m) && !/\bon the list\b/i.test(m)) return pack('create_list', [], guessList(m, ctx), 0.9);
+  if (/\b(delete|get rid of)\b[^?]*\blist\b\s*\??$/i.test(m) && !/\bfrom\b/i.test(m)) return pack('delete_list', [], guessList(m, ctx), 0.9);
+
+  // Mixed add + remove in one message -> intent "update" with per-item op.
+  const hasRemove = /\b(remove|scratch|take off|delete|don'?t need|cross off|get rid of)\b/i.test(m);
+  const hasAddV = /\b(add|grab|get|buy|pick ?up|put)\b/i.test(m);
+  if (hasRemove && hasAddV) {
+    const idx = m.search(/\b(add|grab|get|buy|pick ?up|put)\b/i);
+    const removePart = m.slice(0, idx).replace(/\b(remove|scratch( the)?|take off|delete|don'?t need|cross off|get rid of)\b/gi, ' ');
+    const removeItems = extractItemsMultiList(removePart, ctx).map((i) => ({ ...i, op: 'remove' }));
+    const addItems = extractItemsMultiList(m.slice(idx), ctx).map((i) => ({ ...i, op: 'add' }));
+    const items = [...removeItems, ...addItems];
+    if (items.length) return pack('update', items, null, 0.9);
   }
 
   const isAddCmd = ADD_CMD.test(m) || OUT_OF.test(m);
@@ -236,12 +262,11 @@ async function interpret(message, ctx) {
 
 function applyPolicy(c, dialName) {
   const dial = DIALS[dialName] || DIALS.balanced;
-  if (c.intent === 'query' || c.intent === 'locate' || c.intent === 'list_lists') return { mode: 'answer' };
+  if (['query', 'count', 'locate', 'list_lists', 'create_list', 'delete_list'].includes(c.intent)) return { mode: 'answer' };
   if (c.intent === 'chitchat') return { mode: 'ignore' };
   if (c.needsClarification) return { mode: 'ask' };
   if (c.confidence >= dial.actAt) return { mode: 'act' };
-  if (c.confidence >= dial.askAt) return { mode: 'ask' };
-  return { mode: 'ignore' };
+  return { mode: 'ask' }; // never go silent on a non-chitchat request
 }
 
 module.exports = { interpret, applyPolicy, DIALS, SYSTEM_PROMPT };
