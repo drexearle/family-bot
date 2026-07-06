@@ -26,6 +26,8 @@ class MockAnyList {
   has(list, name) { return this.ensure(list).some((i) => i.toLowerCase() === name.toLowerCase()); }
   listNames() { return Object.keys(this.lists); }
   getItems(list) { return [...this.ensure(list)]; }
+  getAllItems(list) { return [...this.ensure(list)]; }
+  async clearList(list) { const arr = this.ensure(list); const names = [...arr]; arr.length = 0; return { count: names.length, names }; }
   snapshot() { return JSON.parse(JSON.stringify(this.lists)); }
 
   async addItem(list, item) {
@@ -80,6 +82,13 @@ class RealAnyList {
 
   listNames() { return (this.any.lists || []).map((l) => l.name); }
   getItems(list) { return this._list(list).items.filter((i) => !i.checked).map((i) => i.name); }
+  getAllItems(list) { return this._list(list).items.map((i) => i.name); } // includes crossed-off
+  async clearList(list) {
+    const l = this._list(list);
+    const names = [];
+    for (const item of [...l.items]) { try { await l.removeItem(item); names.push(item.name); } catch (e) { /* skip and continue */ } }
+    return { count: names.length, names };
+  }
   snapshot() { const out = {}; for (const l of this.any.lists || []) out[l.name] = l.items.filter((i) => !i.checked).map((i) => i.name); return out; }
 
   async addItem(list, item) {
